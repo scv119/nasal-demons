@@ -17,18 +17,18 @@ GRPC_CPP_PLUGIN = grpc_cpp_plugin
 GRPC_CPP_PLUGIN_PATH ?= `which $(GRPC_CPP_PLUGIN)`
 PROTOS_PATH = ./protos
 SRC_PATH = ./src
+vpath %.proto $(PROTOS_PATH) $(SRC_PATH)
 
-client.pb:
-	$(PROTOC) -I $(PROTOS_PATH) --cpp_out=build/gen  $(PROTOS_PATH)/raft.proto
+raft_client: raft.pb.o raft.grpc.pb.o src/raft_client.cpp
+	$(CXX) $^ $(CXXFLAGS) $(LDFLAGS) -o $@
 
-client.grpc: client.pb
-	$(PROTOC) -I $(PROTOS_PATH) --grpc_out=build/gen --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH)  $(PROTOS_PATH)/client.proto
+.PRECIOUS: %.grpc.pb.cc
+%.grpc.pb.cc: %.proto
+	$(PROTOC) -I $(PROTOS_PATH) --grpc_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
 
-raft.pb:
-	$(PROTOC) -I $(PROTOS_PATH) --cpp_out=build/gen  $(PROTOS_PATH)/raft.proto
-
-raft.grpc: raft.pb
-	$(PROTOC) -I $(PROTOS_PATH) --grpc_out=build/gen --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH)  $(PROTOS_PATH)/raft.proto
-
-state: raft.pb
-	$(CXX) $(CXXFLAGS) -o stats.o $(SRC_PATH)/state.cpp
+.PRECIOUS: %.pb.cc
+%.pb.cc: %.proto
+	$(PROTOC) -I $(PROTOS_PATH) --cpp_out=. $<
+	
+clean:
+	rm -f *.o *.pb.cc *.pb.h raft_client

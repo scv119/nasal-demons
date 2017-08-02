@@ -29,6 +29,12 @@ private:
   int64_t term_;
 };
 
+enum class State {
+  FOLLOWER = 0,
+  CANDIDATE,
+  LEADER,
+};
+
 class NodeState {
 public:
   NodeState(int64_t id, GroupConfig group);
@@ -44,7 +50,7 @@ public:
 private:
   int64_t id_;
   GroupConfig raftGroup_;
-  bool isLeader_;
+  State state_;
 
   // Section: Persistent raft state.
   // TODO(chenshen) these states need to be persisted.
