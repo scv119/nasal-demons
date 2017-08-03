@@ -4,11 +4,11 @@
 #include "state.h"
 
 namespace ndemons {
-namespace {
 static int64_t kDefaultTerm = 1;
 static int64_t kNotVoted = 0;
 static std::size_t kDummyLogIndex = 0;
 
+namespace {
 Log generateDummyLog() { return Log("", 0); }
 } // namespace
 

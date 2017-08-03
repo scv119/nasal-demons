@@ -75,4 +75,6 @@ message NodeConfig {
 message GroupConfig {
     int64 id = 1;
     repeated NodeConfig nodes = 2;
+    int64 heartbeat_timeout_ms = 3;
+    int64 election_timeout_ms = 4;
 }

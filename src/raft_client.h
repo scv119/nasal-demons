@@ -5,7 +5,7 @@
 
 #include <future>
 #include <memory>
-#include <string>
+#include <mutex>
 
 #include "../build/gen/raft.grpc.pb.h"
 #include "../build/gen/raft.pb.h"
@@ -17,6 +17,11 @@ namespace ndemons {
 class RaftClient {
 public:
   explicit RaftClient(std::shared_ptr<grpc::Channel> channel);
+
+  // Disable copy.
+  RaftClient(const RaftClient &) = delete;
+  RaftClient &operator=(const RaftClient &) = delete;
+
   std::future<VoteResponse> requestVote(VoteRequest);
   std::future<AppendResponse> appendEntries(AppendRequest);
 
