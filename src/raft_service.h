@@ -38,21 +38,48 @@ public:
 
 private:
   void ResetTimeout();
+  void ConnectToPeers();
+  void DisconnectFromPeers();
+  void StartRaftWatcher();
+  void StopRaftWatcher();
+  Role GetRole();
+  void UpdateRole(Role newRole);
 
 private:
   NodeState state_;
 
   // Lock to ensure read/write to state_ is atomic.
-  std::mutex stateLock_;
+  std::recursive_mutex stateLock_;
   std::unique_ptr<grpc::Server> server_;
   std::unordered_map<int64_t, std::unique_ptr<RaftClient>> peers_;
 
   // Thread watch the state of the node and change state between
   // Candidate/Leader/Follower when criteria met.
-  std::thread raftWatcher_;
+  std::unique_ptr<std::thread> raftWatcherThread_;
+  friend class RaftWatcher;
+  std::shared_ptr<RaftWatcher> raftWatcher_;
+};
 
-  // Thread responsible for listening rpc calls from peers.
-  std::thread rpcServer_;
+class RaftWatcher {
+public:
+  RaftWatcher(RaftService *service);
+
+  // Disable copy.
+  RaftWatcher(const RaftWatcher &) = delete;
+  RaftWatcher &operator=(const RaftWatcher &) = delete;
+
+  void Start();
+  void Stop();
+
+private:
+  void CheckRoleAndRun();
+  void AsFollower();
+  void AsCandidate();
+  void AsLeader();
+
+private:
+  std::atomic<bool> started_;
+  RaftService *service_;
 };
 
 } // namespace ndemons

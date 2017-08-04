@@ -29,7 +29,7 @@ private:
   int64_t term_;
 };
 
-enum class State {
+enum class Role {
   FOLLOWER = 0,
   CANDIDATE,
   LEADER,
@@ -48,7 +48,7 @@ public:
 private:
   int64_t id_;
   GroupConfig raftGroup_;
-  State state_;
+  std::atomic<Role> role_;
 
   // Section: Persistent raft state.
   // TODO(chenshen) these states need to be persisted.
@@ -65,5 +65,6 @@ private:
   std::unordered_map<int64_t, std::size_t> matchedIndex_;
 
   friend class RaftService;
+  friend class RaftWatcher;
 };
 } // namespace ndemons

@@ -13,7 +13,7 @@ Log generateDummyLog() { return Log("", 0); }
 } // namespace
 
 NodeState::NodeState(int64_t id, GroupConfig group)
-    : id_(id), raftGroup_(group), state_(State::FOLLOWER),
+    : id_(id), raftGroup_(group), role_(Role::FOLLOWER),
       currentTerm_(kDefaultTerm), votedFor_(kNotVoted), logs_(),
       commitedIndex_(kDummyLogIndex), lastApplied_(kDummyLogIndex),
       nextIndex_(), matchedIndex_() {
@@ -21,8 +21,8 @@ NodeState::NodeState(int64_t id, GroupConfig group)
 }
 
 void NodeState::electedAsLeader() noexcept {
-  assert(state_ != State::LEADER);
-  state_ = State::LEADER;
+  assert(role_ != Role::LEADER);
+  role_ = Role::LEADER;
   nextIndex_.clear();
   matchedIndex_.clear();
   for (auto &nodeConfig : raftGroup_.nodes()) {
