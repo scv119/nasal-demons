@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <future>
+#include <functional>
 #include <memory>
 #include <mutex>
 
@@ -22,8 +22,8 @@ public:
   RaftClient(const RaftClient &) = delete;
   RaftClient &operator=(const RaftClient &) = delete;
 
-  std::future<VoteResponse> requestVote(VoteRequest);
-  std::future<AppendResponse> appendEntries(AppendRequest);
+  void requestVote(VoteRequest, std::function<void(VoteResponse)>);
+  void appendEntries(AppendRequest, std::function<void(AppendResponse)>);
 
 private:
   std::unique_ptr<RaftRpc::Stub> stub_;

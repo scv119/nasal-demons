@@ -8,9 +8,11 @@ namespace ndemons {
 RaftClient::RaftClient(std::shared_ptr<grpc::Channel> channel)
     : stub_(RaftRpc::NewStub(channel)) {}
 
-std::future<VoteResponse> RaftClient::requestVote(VoteRequest request) {
-  return std::async(
-      std::launch::async, [ this, request = std::move(request) ]() {
+void RaftClient::requestVote(VoteRequest request,
+                             std::function<void(VoteResponse)> callback) {
+  std::async(
+      std::launch::async,
+      [ this, request = std::move(request), callback = std::move(callback) ]() {
         VoteResponse response;
         grpc::CompletionQueue cq;
         grpc::Status status;
@@ -24,15 +26,17 @@ std::future<VoteResponse> RaftClient::requestVote(VoteRequest request) {
         GPR_ASSERT(got_tag == (void *)1);
         GPR_ASSERT(ok);
         if (status.ok()) {
-          return response;
+          callback(response);
         }
         throw std::runtime_error("VoteRequest failed.");
       });
 }
 
-std::future<AppendResponse> RaftClient::appendEntries(AppendRequest request) {
-  return std::async(
-      std::launch::async, [ this, request = std::move(request) ]() {
+void RaftClient::appendEntries(AppendRequest request,
+                               std::function<void(AppendResponse)> callback) {
+  std::async(
+      std::launch::async,
+      [ this, request = std::move(request), callback = std::move(callback) ]() {
         AppendResponse response;
         grpc::CompletionQueue cq;
         grpc::Status status;
@@ -46,7 +50,7 @@ std::future<AppendResponse> RaftClient::appendEntries(AppendRequest request) {
         GPR_ASSERT(got_tag == (void *)1);
         GPR_ASSERT(ok);
         if (status.ok()) {
-          return response;
+          callback(response);
         }
         throw std::runtime_error("Append entries request failed.");
       });

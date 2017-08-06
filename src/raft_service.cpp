@@ -2,6 +2,7 @@
 // All rights reserved.
 
 #include "raft_service.h"
+#include <chrono>
 
 namespace ndemons {
 
@@ -86,6 +87,19 @@ void RaftService::DisconnectFromPeers() {
   peers_.clear();
 }
 
+bool RaftService::TryPromoteToCandidate() noexcept {
+  if (state_.lastHeartBeat_ + state_.heartBeatTimeout_ >
+      std::chrono::system_clock::now()) {
+    return false;
+  }
+  std::lock_guard<std::recursive_mutex>(stateLock_);
+  state_.currentTerm++;
+  state_.votedFor_ = state_.id_;
+  state_.voteRecieved_ = 1;
+  state_.role = Role::CANDIDATE;
+  return true;
+}
+
 void RaftService::StopRaftWatcher() {
   std::lock_guard<std::recursive_mutex>(stateLock_);
   raftWatcher_.Stop();
@@ -99,15 +113,43 @@ RaftWatcher::RaftWatcher(RaftService *service)
 
 void RaftWatcher::Start() {
   started_ = true;
-  // Alwasy check role for the first run.
-  roleChange_ = true;
   while (started_) {
-    CheckRoleAndRun();
+    Role role;
+    int64_t term;
+    service_->GetRoleAndTerm(role, term);
+    if (role == Role::FOLLOWER) {
+      AsFollower();
+    } else if (role == Role::CANDIDATE) {
+    } else {
+    }
+  }
+}
+
+void RaftWatcher::AsFollower() {
+  while (started_) {
+    // TODO(chenshen) std::this_thread::sleep_for(2s);
+    if (service_->TryPromoteToCandidate()) {
+      break;
+    }
+  }
+}
+
+void RaftWatcher::AsCandidate(int64_t candidacyTerm) {
+  VoteRequest request;
+  request.set_term(candidacyTerm);
+  request.set_candidate_id(service_.state_.id_);
+  for (auto &peer : service_.peers_) {
+    peer.second->requestVote(request,
+                             [
+                               service_,
+                             ](VoteResponse response){
+                                 // TODO
+                             });
+  }
+  while (started_) {
   }
 }
 
 void RaftWatcher::Stop() { started_ = false; }
-
-void RaftWatcher::CheckRoleAndRun() {}
 
 } // namespace ndemons

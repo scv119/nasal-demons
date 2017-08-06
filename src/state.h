@@ -43,20 +43,22 @@ public:
   NodeState(const NodeState &state) = delete;
   NodeState &operator=(const NodeState &state) = delete;
 
-  void electedAsLeader() noexcept;
-
 private:
   int64_t id_;
   GroupConfig raftGroup_;
-  std::atomic<Role> role_;
+  std::chrono::duration heartBeatTimeout_;
 
   // Section: Persistent raft state.
   // TODO(chenshen) these states need to be persisted.
   int64_t currentTerm_;
   int64_t votedFor_;
+  std::size_t voteRecieved_;
   std::vector<Log> logs_;
 
   // Section: Volatile raft state.
+  std::atomic<Role> role_;
+  std::atomic<std::chrono::system_clock::time_point> lastHeartBeat_;
+
   std::size_t commitedIndex_;
   std::size_t lastApplied_;
 

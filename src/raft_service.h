@@ -37,13 +37,13 @@ public:
   void Stop();
 
 private:
-  void ResetTimeout();
   void ConnectToPeers();
   void DisconnectFromPeers();
   void StartRaftWatcher();
   void StopRaftWatcher();
-  Role GetRole();
-  void UpdateRole(Role newRole);
+  void GetRoleAndTerm(Role &role, int64_t &term) noexcept const;
+  int64_t GetTerm() noexcept const;
+  bool TryPromoteToCandidate() noexcept;
 
 private:
   NodeState state_;
@@ -72,13 +72,12 @@ public:
   void Stop();
 
 private:
-  void CheckRoleAndRun();
+  void Run();
   void AsFollower();
-  void AsCandidate();
-  void AsLeader();
 
 private:
   std::atomic<bool> started_;
+  std::atomic<bool> roleChanged_;
   RaftService *service_;
 };
 
