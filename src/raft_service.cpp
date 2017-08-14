@@ -134,19 +134,25 @@ void RaftWatcher::AsFollower() {
   }
 }
 
+void RaftWatcher::ReceiveVoteResponse(int64_t candidacyTerm,
+                                      VoteResponse response) {
+  if (response.Term() != candidacyTerm) {
+    return;
+  }
+}
+
 void RaftWatcher::AsCandidate(int64_t candidacyTerm) {
   VoteRequest request;
   request.set_term(candidacyTerm);
   request.set_candidate_id(service_.state_.id_);
   for (auto &peer : service_.peers_) {
-    peer.second->requestVote(request,
-                             [
-                               service_,
-                             ](VoteResponse response){
-                                 // TODO
-                             });
+    peer.second->requestVote(request, [
+      this,
+    ](VoteResponse response) { this->ReceiveVoteResponse(); });
   }
   while (started_) {
+    // TODO(chenshen) std::this_thread::sleep_for(2s);
+    // http://en.cppreference.com/w/cpp/thread/condition_variable
   }
 }
 

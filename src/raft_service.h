@@ -44,6 +44,8 @@ private:
   void GetRoleAndTerm(Role &role, int64_t &term) noexcept const;
   int64_t GetTerm() noexcept const;
   bool TryPromoteToCandidate() noexcept;
+  void ReceiveVoteResponse();
+  void ReceiveAppendResponse();
 
 private:
   NodeState state_;
@@ -74,10 +76,13 @@ public:
 private:
   void Run();
   void AsFollower();
+  void AsCandidate();
+  void ReceiveVoteResponse();
 
 private:
   std::atomic<bool> started_;
   std::atomic<bool> roleChanged_;
+  std::mutex stateMutex_;
   RaftService *service_;
 };
 

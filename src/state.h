@@ -43,28 +43,41 @@ public:
   NodeState(const NodeState &state) = delete;
   NodeState &operator=(const NodeState &state) = delete;
 
+  AppendResponse ReceiveHeartbeat(AppendRequest request);
+
+private:
+  void RunAsFollower();
+
 private:
   int64_t id_;
   GroupConfig raftGroup_;
   std::chrono::duration heartBeatTimeout_;
+  std::chrono::duration voteTimeout_;
 
-  // Section: Persistent raft state.
+  // Section: Role and Term state.
   // TODO(chenshen) these states need to be persisted.
+  std::mutex roleMutex_;
+  std::condition_variable roleChanged_;
   int64_t currentTerm_;
-  int64_t votedFor_;
+  Role role_;
+
+  // Section: Volatile candiate state.
+  std::mutex candidateStateMutex_;
+  int64_t voteTerm_;
   std::size_t voteRecieved_;
-  std::vector<Log> logs_;
+  int64_t votedFor_;
 
   // Section: Volatile raft state.
-  std::atomic<Role> role_;
   std::atomic<std::chrono::system_clock::time_point> lastHeartBeat_;
-
   std::size_t commitedIndex_;
   std::size_t lastApplied_;
 
   // Section: Volatile raft states for leaders.
   std::unordered_map<int64_t, std::size_t> nextIndex_;
   std::unordered_map<int64_t, std::size_t> matchedIndex_;
+
+  // Section: Logs
+  std::vector<Log> logs_;
 
   friend class RaftService;
   friend class RaftWatcher;
