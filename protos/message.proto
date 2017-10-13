@@ -1,0 +1,26 @@
+// Copyright (c) 2017, Chen Shen
+// All rights reserved.
+// The message definition sending between Raft nodes.
+
+syntax = "proto2";
+
+package ndemons;
+
+enum MessageType {
+    HEARTBEAT_REQ = 0;
+    HEARTBEAT_RESP = 1;
+    APPEND_REQ = 2;
+    APPEND_RESQ = 3;
+    VOTE_REQ = 4;
+    VOTE_RESP = 5;
+}
+
+message Message {
+    required MessageType type = 1;
+    required int64 from = 2;
+    required int64 to = 3;
+    optional int64 term = 4;
+    optional int64 leader_id = 5;
+    optional int64 candidate_id = 6;
+    optional bool success = 7;
+}

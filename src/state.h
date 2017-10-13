@@ -3,31 +3,15 @@
 
 #pragma once
 
-#include <string>
-#include <unordered_map>
+#include "boost/asio.hpp"
+#include "boost/date_time/posix_time/posix_time.hpp"
+#include "message.pb.h"
+#include "peer.h"
+#include <memory>
+#include <mutex>
 #include <vector>
 
-#include "../build/gen/raft.pb.h"
-
 namespace ndemons {
-extern static int64_t kNotVoted;
-
-class Log {
-public:
-  Log(std::string &&payload, int64_t term)
-      : payload_(std::move(payload)), term_(term) {}
-
-  // Disallow copy.
-  Log(const Log &log) = delete;
-  Log &operator=(const Log &log) = delete;
-
-  int64_t Term() const { return term_; }
-  std::string &Payload() { return payload_; }
-
-private:
-  std::string payload_;
-  int64_t term_;
-};
 
 enum class Role {
   FOLLOWER = 0,
@@ -35,51 +19,59 @@ enum class Role {
   LEADER,
 };
 
-class NodeState {
+class Node {
 public:
-  NodeState(int64_t id, GroupConfig group);
+  Node(int64_t id, std::vector<Peer> peers,
+       std::shared_ptr<boost::asio::io_service> io);
+  Node(const Node &) = delete;
+  Node &operator=(const Node &) = delete;
+  Node(Node &&node) = default;
+  Node &operator=(Node &&node) = default;
 
-  // Disallow copy.
-  NodeState(const NodeState &state) = delete;
-  NodeState &operator=(const NodeState &state) = delete;
-
-  AppendResponse ReceiveHeartbeat(AppendRequest request);
+  void start();
 
 private:
-  void RunAsFollower();
+  void BecomeFollower();
+  void BecomeCandidate();
+  void BecomeLeader();
+
+  void HandleMessage(Message m);
+  void HandleFollowerMessage(Message m);
+  void HandleCandidateMessage(Message m);
+  void HandleLeaderMessage(Message m);
+
+  void HandleSendHeartBeatTimer();
+  void HandleHeartBeatTimeout();
+  void HandleVoteTimeout();
+
+  void SetFollowerTimer();
+  void SetCandidateTimer();
+  void SetLeaderTimer();
+  void CancelTimer();
+
+  void SendHeartBeat();
+  void RequestVote();
+  void SendMessage(Message m);
+  void SendAppendResponse(bool success);
+  void SendVoteResponse(bool success);
 
 private:
   int64_t id_;
-  GroupConfig raftGroup_;
-  std::chrono::duration heartBeatTimeout_;
-  std::chrono::duration voteTimeout_;
-
-  // Section: Role and Term state.
-  // TODO(chenshen) these states need to be persisted.
-  std::mutex roleMutex_;
-  std::condition_variable roleChanged_;
-  int64_t currentTerm_;
   Role role_;
-
-  // Section: Volatile candiate state.
-  std::mutex candidateStateMutex_;
-  int64_t voteTerm_;
-  std::size_t voteRecieved_;
+  int64_t currentTerm_;
   int64_t votedFor_;
+  int64_t leaderId_;
 
-  // Section: Volatile raft state.
-  std::atomic<std::chrono::system_clock::time_point> lastHeartBeat_;
-  std::size_t commitedIndex_;
-  std::size_t lastApplied_;
+  std::mutex mutex_;
+  std::unique_ptr<boost::asio::deadline_timer> timer_;
+  std::shared_ptr<boost::asio::io_service> io_;
 
-  // Section: Volatile raft states for leaders.
-  std::unordered_map<int64_t, std::size_t> nextIndex_;
-  std::unordered_map<int64_t, std::size_t> matchedIndex_;
+  std::vector<Peer> peers_;
 
-  // Section: Logs
-  std::vector<Log> logs_;
+  boost::posix_time::duration followerTimeout_;
+  boost::posix_time::duration voteTimeout_;
+  boost::posix_time::duration sendHeartbeatInterval_;
+  boost::posix_time::ptime lastHeardFromLeader_;
+}
 
-  friend class RaftService;
-  friend class RaftWatcher;
-};
 } // namespace ndemons

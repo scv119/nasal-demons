@@ -4,102 +4,97 @@
 #include "state.h"
 
 namespace ndemons {
-static int64_t kDefaultTerm = 1;
-static int64_t kNotVoted = 0;
-static std::size_t kDummyLogIndex = 0;
 
-namespace {
-Log generateDummyLog() { return Log("", 0); }
-} // namespace
+Node::Node(int64_t id, std::vector<Peer> peers,
+           std::shared_ptr<boost::asio::io_service> io)
+    : id_(id) role_(Role::FOLLOWER), currentTerm_(0), votedFor_(0), mutex(),
+      timer_(), io_(io), peers_(peers) {}
 
-NodeState::NodeState(int64_t id, GroupConfig group)
-    : id_(id), raftGroup_(group), role_(Role::FOLLOWER),
-      currentTerm_(kDefaultTerm), votedFor_(kNotVoted), logs_(),
-      commitedIndex_(kDummyLogIndex), lastApplied_(kDummyLogIndex),
-      nextIndex_(), matchedIndex_() {
-  logs_.push_back(generateDummyLog());
+void Node::start() { BecomeFollower(); }
+
+void Node::BecomeFollower() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  role_ = Role::FOLLOWER;
+  votedFor_ = 0;
+  SetFollowerTimer();
 }
 
-AppendResponse NodeState::ReceiveHeartbeat(AppendRequest request) {
-  std::lock_guard<std::mutext> guard(roleMutex_);
-  AppendResponse response;
-
-  if (request.term() < currentTerm_) {
-    repsonse.set_term(currentTerm_);
-    response.set_success(false);
-    return repsonse;
-  }
-
-  lastHeartBeat_ = std::chrono::system_clock::now();
-  response.set_term(request.term());
-  currentTerm = request.term();
-
-  if (role_ != Role::FOLLOWER) {
-    role_ = Role::FOLLOWER;
-    response.set_success(true);
-    roleChanged_.notify_one();
-  }
-  return response;
+void Node::BecomeCandidate() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  currentTerm_++;
+  votedFor_ = id_;
+  role_ = Role::CANDIDATE;
+  RequestVote();
+  SetCandidateTimer();
 }
 
-void NodeState::ReceiveVoteResponse(VoteResponse response) {
-  std::unique_lock<std::mutex> cLock(candidateStateMutex_);
-  if (response.term() != voteTerm_) {
-    return;
-  }
-  voteRecieved_++;
-  if (voteRecieved_ < 3) {
-    return;
-  }
-
-  std::lock_guard<std::mutext> guard(roleMutex_);
-  if (role_ != Role::CANDIDATE || currentTerm != voteTerm_ + 1) {
-    return;
-  }
-  voteRecieved_ = 0;
-  voteFor_ = 0;
-  voteTerm_ = 0;
-  currentTerm++;
-  role = Role::LEADER;
-  return;
+void Node::BecomeLeader() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  role_ = Role::LEADER;
+  SetLeaderTimer();
 }
 
-void NodeState::RunAsFollower() {}
-
-void NodeState::RunAsCandidate() {
-  std::unique_lock<std::mutex> lock(roleMutex_);
-  if (role_ != Role::CANDIDATE) {
-    return;
+void Node::HandleMessage(Message m) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  switch (role_) {
+  case Role::FOLLOWER:
+    return HandleFollowerMessage(m);
+  case Role::CANDIDATE:
+    return HandleCandidateMessage(m);
+  default:
+    return HandleLeaderMessage(m);
   }
-
-  std::unique_lock<std::mutex> cLock(candidateStateMutex_);
-  voteTerm_ = currentTerm_ + 1;
-  voteRecieved_ = 1;
-  votedFor = id_;
-  VoteRequest request;
-  request.set_term(voteTerm_);
-  cLock.unlock();
-
-  request.set_candidate_id(id_);
-  for (auto &peer : peers_) {
-    peer.second->requestVote(request, [
-      this,
-    ](VoteResponse response) { this->ReceiveVoteResponse(response); });
-  }
-  auto now = std::chrono::system_clock::now();
-  roleChanged_.wait_until(x`, now + voteTimeout_);
-
-  if (role_ != Role::LEADER) {
-    return;
-  }
-
-  std::unique_lock<std::mutex> cLock1(candidateStateMutex_);
-  voteTerm_ = 0;
-  voteRecieved_ = 0;
-  votedFor = 0;
-  cLock.unlock();
-
-  // timeout logic
 }
+
+void Node::HandleFollowerMessage(Message m) {
+  switch (m.type()) {
+  case MessageType::HEARTBEAT_REQ:
+  case MessageType::APPEND_REQ:
+    if (m.term() < currentTerm_) {
+      return SendAppendResponse(false);
+    }
+    lastHeardFromLeader_ = boost::posix_time::second_clock::local_time();
+    if (m.term() > currentTerm_) {
+      currentTerm_ = m.term();
+      leaderId_ = m.leader_id();
+    }
+    // TODO: implement the logs logic.
+    SendAppendResponse(true);
+    break;
+  case MessageType::VOTE_REQ:
+    if (m.term() >= currentTerm_ && (votedFor_ == 0 || votedFor_ == m.candidate_id()) {
+      votedFor_ = m.from_id();
+      return SendVoteResponse(true);
+    }
+    // TODO: implement the logs logic.
+    return SendVoteResponse(false);
+    break;
+  default:
+    // Do nothing for other messages.
+  }
+}
+
+void Node::HandleCandidateMessage(Message m) {}
+
+void Node::HandleLeaderMessage(Message m) {}
+
+void Node::HandleSendHeartBeatTimer() {}
+void Node::HandleHeartBeatTimeout() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (/* not timeout */) {
+    SetFollowerTimer();
+  } else {
+    BecomeCandidate();
+  }
+}
+void Node::HandleVoteTimeout() {}
+void Node::SetFollowerTimer() {}
+void Node::SetCandidateTimer() {}
+void Node::SetLeaderTimer() {}
+void Node::CancelTimer() {}
+
+void Node::SendHeartBeat() {}
+void Node::RequestVote() {}
+void Node::SendMessage(Message m) {}
 
 } // namespace ndemons

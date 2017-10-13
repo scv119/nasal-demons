@@ -19,16 +19,6 @@ PROTOS_PATH = ./protos
 SRC_PATH = ./src
 vpath %.proto $(PROTOS_PATH) $(SRC_PATH)
 
-raft_client: raft.pb.o raft.grpc.pb.o src/raft_client.cpp
-	$(CXX) $^ $(CXXFLAGS) $(LDFLAGS) -o $@
-
-.PRECIOUS: %.grpc.pb.cc
-%.grpc.pb.cc: %.proto
-	$(PROTOC) -I $(PROTOS_PATH) --grpc_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<
-
 .PRECIOUS: %.pb.cc
 %.pb.cc: %.proto
 	$(PROTOC) -I $(PROTOS_PATH) --cpp_out=. $<
-	
-clean:
-	rm -f *.o *.pb.cc *.pb.h raft_client
